@@ -89,7 +89,7 @@ def main():
         if status not in statuses:
             statuses[status] = dict()
         if year not in statuses[status]:
-            statuses[status][year] = [dict(),0] #[word dict, number of studies for that year]
+            statuses[status][year] = [dict(),0,set()] #[word dict, number of studies for that year, set of nct numbers of studies that mention any of the required words]
         
         #prepare input
         toGet.append({"year":year,
@@ -114,6 +114,9 @@ def main():
             #filter only words we want
             if wordsWeWant is not None and (word not in wordsWeWant):
                 continue
+            
+            # set of nct numbers of studies that mention any of the required words, for calculating composite term
+            yearArr[2].add(study["NCTNum"])
 
             #word already found in year
             if word in yearDict:
@@ -141,7 +144,7 @@ def main():
         for yearVal in statusVal.values():
             maxWords = max(maxWords,len(yearVal[0]))
         
-        shape = (maxWords+2,colsPerYear*len(statusVal))
+        shape = (maxWords+3,colsPerYear*len(statusVal))
         output =np.full(shape, "", dtype="object", order='C')
 
         sortedYears = sorted(statusVal.items(), key=lambda item: int(item[0]) if item[0].isdecimal() else 99999999)
@@ -150,14 +153,17 @@ def main():
             #titles
             col = yearInd*colsPerYear
             output[0,col] = yearKey
-            output[0,col+1] = "Num studies:"+str(yearValArr[1])
-            output[1,col:col+colsPerYear]=colTitles
+            output[0,col+1] = "Num studies:"
+            output[1,col+1] = yearValArr[1]
+            output[0,col+2] = "percent of studies in year mentioning ANY of the words:"
+            output[1,col+2] = str(100*len(yearValArr[2])/yearValArr[1])+"%"
+            output[2,col:col+colsPerYear]=colTitles
 
             #values
             sortedWords = sorted(yearVal.items(), key=lambda item: item[1][0],reverse =True)
             for row,(wordKey,wordVal) in enumerate(sortedWords):
                 #for average, divide by number of studies in group (not len(wordVal[1]) since wordVal[1] has no entries of 0%)
-                output[row+2,col:col+colsPerYear]=[wordKey,wordVal[0],str(sum(wordVal[1])/yearValArr[1])+"%",str(100*wordVal[2]/yearValArr[1])+"%"]
+                output[row+3,col:col+colsPerYear]=[wordKey,wordVal[0],str(sum(wordVal[1])/yearValArr[1])+"%",str(100*wordVal[2]/yearValArr[1])+"%"]
     
         #save the excel sheet with name of status
         with open(os.path.join(outputDir,statusKey+'.csv'), 'w', newline='', encoding="utf-8-sig") as fp:
